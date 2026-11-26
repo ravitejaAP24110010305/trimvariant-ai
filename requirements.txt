@@ -1,0 +1,22 @@
+# --- web app ---
+fastapi>=0.110
+uvicorn[standard]>=0.29
+python-multipart>=0.0.9
+pydantic>=2.6
+
+# --- image processing / evaluation ---
+numpy>=1.26
+pillow>=10.2
+opencv-python-headless>=4.9
+scikit-image>=0.22
+
+# --- generative AI (install the CUDA build of torch first if you have an NVIDIA GPU, see README) ---
+torch>=2.2
+diffusers>=0.30
+transformers>=4.40
+accelerate>=0.30
+safetensors>=0.4
+
+# --- tests ---
+pytest>=8.0
+httpx>=0.27

@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TrimVariant AI</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="logo">TV</span><div><strong>TrimVariant AI</strong><small>Vehicle feature variant editor</small></div></div>
+  <div class="topbar-right">
+    <span id="engineChip" class="chip">checking engine…</span>
+    <a class="btn ghost" href="/api/report.md" target="_blank">Report (.md)</a>
+    <a class="btn ghost" href="/api/report.csv">Export CSV</a>
+  </div>
+</header>
+
+<div id="toast" class="toast" hidden></div>
+
+<main class="layout">
+  <aside class="panel controls">
+    <section>
+      <h2><span>1</span> Source image</h2>
+      <select id="imageSelect"></select>
+      <div id="dropzone" class="dropzone" tabindex="0">
+        <p><strong>Drop a vehicle photo</strong> or click to upload</p>
+        <small>JPG / PNG / WEBP · min 256px</small>
+        <input id="fileInput" type="file" accept=".jpg,.jpeg,.png,.webp" hidden>
+      </div>
+      <label class="row">View
+        <select id="viewSelect">
+          <option value="side">Side</option><option value="front">Front</option>
+          <option value="rear">Rear</option><option value="three_quarter">Three-quarter</option>
+        </select>
+      </label>
+      <button id="deleteImageBtn" class="btn ghost small" type="button">Delete selected image</button>
+    </section>
+
+    <section>
+      <h2><span>2</span> Feature variant</h2>
+      <label>Feature<select id="featureSelect"></select></label>
+      <label>Option<select id="optionSelect"></select></label>
+      <label><span>Extra details <span class="hint">(optional)</span></span>
+        <input id="customPrompt" type="text" maxlength="500" placeholder="e.g. 18-inch, gloss finish">
+      </label>
+    </section>
+
+    <section>
+      <h2><span>3</span> Editable region</h2>
+      <div class="tools" role="group" aria-label="Mask tools">
+        <button class="tool active" data-tool="brush" type="button">Brush</button>
+        <button class="tool" data-tool="rect" type="button">Rectangle</button>
+        <button class="tool" data-tool="erase" type="button">Eraser</button>
+      </div>
+      <label class="row">Brush size <input id="brushSize" type="range" min="4" max="120" value="28"><output id="brushOut">28</output></label>
+      <div class="btn-row">
+        <button id="undoBtn" class="btn ghost small" type="button">Undo</button>
+        <button id="clearBtn" class="btn ghost small" type="button">Clear</button>
+        <button id="wheelsBtn" class="btn small" type="button">Auto-detect wheels</button>
+      </div>
+      <label><span>Quick region <span class="hint">(approximate)</span></span><select id="presetSelect"></select></label>
+    </section>
+
+    <section>
+      <h2><span>4</span> Generation settings</h2>
+      <label>Pipeline
+        <select id="modeSelect">
+          <option value="controlnet">Inpainting + ControlNet (canny)</option>
+          <option value="inpaint">Inpainting only (baseline)</option>
+        </select>
+      </label>
+      <label class="row">Steps <input id="steps" type="range" min="10" max="60" value="30"><output></output></label>
+      <label class="row">Guidance <input id="guidance" type="range" min="1" max="15" step="0.5" value="7.5"><output></output></label>
+      <label class="row">Strength <input id="strength" type="range" min="0.5" max="1" step="0.05" value="1"><output></output></label>
+      <label class="row cn-only">ControlNet scale <input id="cnScale" type="range" min="0" max="2" step="0.1" value="1"><output></output></label>
+      <label class="check cn-only"><input id="keepInner" type="checkbox"> Keep original feature outline as guidance</label>
+      <label class="row">Mask grow (px) <input id="dilate" type="range" min="0" max="32" value="4"><output></output></label>
+      <label class="row">Edge feather (px) <input id="feather" type="range" min="0" max="32" value="8"><output></output></label>
+      <label class="row">Seed
+        <span class="seed"><input id="seed" type="number" min="0" max="2147483647" placeholder="random"><button id="diceBtn" class="btn ghost small" type="button" title="Random seed">🎲</button></span>
+      </label>
+    </section>
+  </aside>
+
+  <section class="stage">
+    <div class="panel stage-card">
+      <div class="stage-head">
+        <h2>Canvas <small id="imageMeta"></small></h2>
+        <div class="btn-row">
+          <button id="compareBtn" class="btn" type="button">Compare both pipelines</button>
+          <button id="generateBtn" class="btn primary" type="button">Generate variant</button>
+        </div>
+      </div>
+      <div id="canvasWrap" class="canvas-wrap">
+        <div id="emptyState" class="empty">Upload or select a vehicle image to start.</div>
+        <img id="baseImg" alt="Selected vehicle" hidden>
+        <canvas id="maskCanvas" hidden></canvas>
+      </div>
+      <p class="hint">Paint over the feature you want to change (wheels, grille, roof…). Everything outside the mask is preserved.</p>
+    </div>
+
+    <div class="panel">
+      <div class="stage-head">
+        <h2>Variants <small id="variantCount"></small></h2>
+        <button id="refreshBtn" class="btn ghost small" type="button">Refresh</button>
+      </div>
+      <div id="gallery" class="gallery"></div>
+    </div>
+  </section>
+</main>
+
+<div id="modal" class="modal" hidden>
+  <div class="modal-card">
+    <button id="modalClose" class="btn ghost small close" type="button" aria-label="Close">✕</button>
+    <div class="modal-body">
+      <div>
+        <div class="tabs" id="viewTabs"></div>
+        <div id="compareBox" class="compare-box">
+          <img id="cmpBefore" alt="Original"><img id="cmpAfter" alt="Variant">
+        </div>
+        <input id="cmpSlider" type="range" min="0" max="100" value="50" aria-label="Before / after">
+        <p class="hint center">Drag to compare original ⟷ variant</p>
+      </div>
+      <div id="modalInfo" class="modal-info"></div>
+    </div>
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
